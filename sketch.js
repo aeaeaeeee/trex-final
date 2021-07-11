@@ -3,10 +3,12 @@ var over = 0;
 var gamestate = play;
 
 var dino, run, collided;
-var ground, invisible, photograph;
+var ground, invisible, groundimg;
 
 var cloudgroup, cloudImage;
 var obstaclegroup, obstacle1, obstacle2, obstacle3, obstacle4, obstacle5, obstacle6;
+
+var backImg; 
 
 var score;
 
@@ -15,90 +17,88 @@ var jumpsound, checkpointsound, diesound;
 
 
 function preload() {
-  run = loadAnimation("trex1.png", "trex3.png", "trex4.png");
-  collided = loadAnimation("trex_collided.png");
+  run = loadAnimation("assets/trex_1.png", "assets/trex_2.png", "assets/trex_3.png");
+  collided = loadAnimation("assets/trex_collided.png");
 
-  photograph = loadImage("ground2.png");
-  cloudImage = loadImage("cloud.png");
+  cloudImage = loadImage("assets/cloud.png");
+  backImg = loadImage("assets/backgroundImg.png");
+  sunAnimation = loadImage("assets/sun.png");
 
-  obstacle1 = loadImage("obstacle1.png");
-  obstacle2 = loadImage("obstacle2.png");
-  obstacle3 = loadImage("obstacle3.png");
-  obstacle4 = loadImage("obstacle4.png");
-  obstacle5 = loadImage("obstacle5.png");
-  obstacle6 = loadImage("obstacle6.png");
+  obstacle1 = loadImage("assets/obstacle1.png");
+  obstacle2 = loadImage("assets/obstacle2.png");
   
-  endimg = loadImage("gameOver.png");
-  reimg = loadImage("restart.png");
+  endimg = loadImage("assets/gameOver.png");
+  reimg = loadImage("assets/restart.png");
   
-  jumpsound = loadSound("jump.mp3");
-  diesound = loadSound("die.mp3");
-  checkpointsound = loadSound("checkPoint.mp3");
+  jumpsound = loadSound("assets/sounds/jump.wav");
+  diesound = loadSound("assets/sounds/collided.wav");
 }
 
 function setup() {
-  createCanvas(600, 200);
+  createCanvas(windowWidth, windowHeight);
+ sun = createSprite(width-50, 100, 10, 10);
+ sun.addAnimation("sun", sunAnimation);
+ sun.scale = 0.1;
 
-  dino = createSprite(50, 160, 20, 50);
-  dino.addAnimation("run", run);
+  dino = createSprite(50, height-70, 20, 50);
+  dino.addAnimation("running", run);
   dino.addAnimation("collided", collided);
-  dino.scale = 0.5;
+  dino.setCollider("circle", 0, 0, 350);
+  dino.scale = 0.08;
+  dino.velocityX = 4;
 
-  ground = createSprite(200, 180, 400, 20);
-  ground.addImage("photograph", photograph);
-  ground.x = ground.width / 2;
+  invisible = createSprite(width/2, height-10, width, 125);
+  invisible.shapeColor = "red";
 
-  end = createSprite(300, 100);
+  ground = createSprite(width/2, height, width, 2);
+  ground.x = ground.width/2;
+  ground.velocityX = -(6 + 3* score/100);
+
+  end = createSprite(width/2, height/2- 50);
   end.addImage(endimg);
   
-  restart = createSprite(300, 140);
+  restart = createSprite(width/2, height/2);
   restart.addImage(reimg);
   
   end.scale = 0.5;
-  restart.scale = 0.5;
+  restart.scale = 0.1;
   
-  
-  dino.setCollider("circle", 0, 0, 40);
-  
-  invisible = createSprite(200, 189, 400, 10);
-  invisible.visible = false;
+  end.visible = false;
+  restart.visible = false;
 
-  obstaclegroup = createGroup();
-  cloudgroup = createGroup();
+  obstaclegroup = new Group();
+  cloudgroup = new Group();
 
   score = 0;
+  window.focus();
 }
 
 function draw() {
-  background(180);
+  background(backImg);
+  textSize(20);
   fill("black");
-  text("Score: " + score, 500, 50);
+  text("Score: " + score, windowWidth/2 + camera.position.x - 200, 50);
 
   if (gamestate === play) {
-    end.visible = false;
-    restart.visible = false;
-   
-    ground.velocityX = -(4 + 2* score/100);
-    
-    score = score + Math.round(frameCount / 100);
-    
-    
-    if(score>0 && score%1000 === 0)
-    {checkpointsound.play();}
-    
-    
-    
-    if (ground.x < 0) {
-      ground.x = ground.width / 2;
+    camera.position.x = dino.x;
+
+    if(camera.position.x + width/2 > ground.x + ground.width/2)
+    {
+   ground.x = camera.position.x;
+   invisible.x = camera.position.x;
     }
 
-    if (keyDown("space") && dino.y >= 100) {
+    score = score + Math.round(getFrameRate()/60);
+
+    if ((touches.length > 0 || keyDown("SPACE")) && dino.y >= height-120) {
       dino.velocityY = -11.5;
       jumpsound.play();
+      touches = [];
     }
 
-    dino.velocityY = dino.velocityY + 1.5;
-
+    dino.velocityY = dino.velocityY + 0.8;
+    
+     dino.collide(invisible);
     spawnobstacles();
     spawnclouds();
 
@@ -110,7 +110,6 @@ function draw() {
    else if (gamestate === over) {
      end.visible = true;
      restart.visible = true;
-    
     ground.velocityX = 0;
     dino.velocityX = 0;
     
@@ -122,15 +121,12 @@ function draw() {
     obstaclegroup.setVelocityXEach(0);
     cloudgroup.setVelocityXEach(0);
     
-    if(mousePressedOver(restart))
+    if(touches.length > 0 || keyDown("SPACE"))
      {
        reset();
-       
+       touches = [];
     }
   }
-
-
-  dino.collide(invisible);
 
   drawSprites();
 }
@@ -145,18 +141,17 @@ function reset()
   obstaclegroup.destroyEach();
   cloudgroup.destroyEach();
   
-  dino.changeAnimation("run", run);
+  dino.changeAnimation("running", run);
   
   score = 0;
-  velocity = -(4 + 2* score/100);
 }
 
 function spawnobstacles() {
   if (frameCount % 100 === 0) {
-    var obstacle = createSprite(600, 165, 10, 40);
-    obstacle.velocityX = -5;
+    var obstacle = createSprite(camera.position.x + windowWidth/2, height-95, 20, 30);
+    obstacle.velocityX = -(6 + 3* score/100);
 
-    var rand = Math.round(random(1, 6));
+    var rand = Math.round(random(1, 2));
     switch (rand) {
       case 1:
         obstacle.addImage(obstacle1);
@@ -164,24 +159,13 @@ function spawnobstacles() {
       case 2:
         obstacle.addImage(obstacle2);
         break;
-      case 3:
-        obstacle.addImage(obstacle3);
-        break;
-      case 4:
-        obstacle.addImage(obstacle4);
-        break;
-      case 5:
-        obstacle.addImage(obstacle5);
-        break;
-      case 6:
-        obstacle.addImage(obstacle6);
-        break;
       default: break;
     }
 
-    obstacle.scale = 0.55;
-    obstacle.lifetime = 130;
-
+    obstacle.scale = 0.3;
+    obstacle.lifetime = 90;
+    obstacle.depth = dino.depth;
+    dino.depth +=1;
     obstaclegroup.add(obstacle);
   }
 }
@@ -189,13 +173,13 @@ function spawnobstacles() {
 
 function spawnclouds() {
   if (frameCount % 100 === 0) {
-    cloud = createSprite(600, 100, 40, 10);
+    cloud = createSprite(camera.position.x + windowWidth/2, height-300, 40, 10);
     cloud.addImage(cloudImage);
-    cloud.y = Math.round(random(10, 60))
-    cloud.scale = 0.6;
-    cloud.velocityX = -5;
+    cloud.y = Math.round(random(100, 220))
+    cloud.scale = 0.5;
+    cloud.velocityX = -3;
 
-    cloud.lifetime = 130;
+    cloud.lifetime = 1000;
 
     cloud.depth = dino.depth;
     dino.depth = dino.depth + 1;
